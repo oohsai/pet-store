@@ -3,8 +3,8 @@ import React from "react";
 import { Label } from "./ui/label";
 import { Input } from "./ui/input";
 import { Textarea } from "./ui/textarea";
-import { Button } from "./ui/button";
 import { usePetContext } from "@/lib/hooks";
+import PetFormBtn from "./pet-form-btn";
 
 type PetFormProps = {
   actionType: string;
@@ -16,27 +16,48 @@ export default function PetForm({
   onFormSubmission,
 }: PetFormProps) {
   const { handleAddPet, handleEditPet, selectedPet } = usePetContext();
-  const handleSubmit = (event: React.FormEvent<HTMLFormElement>) => {
-    event.preventDefault();
-    const formData = new FormData(event.currentTarget);
-    const pet = {
-      name: formData.get("name") as string,
-      ownerName: formData.get("ownerName") as string,
-      imageUrl:
-        (formData.get("imageUrl") as string) ||
-        "https://bytegrad.com/course-assets/react-nextjs/pet-placeholder.png",
-      age: +(formData.get("age") as string),
-      notes: formData.get("notes") as string,
-    };
-    if (actionType === "add") {
-      handleAddPet(pet);
-    } else if (actionType === "edit") {
-      handleEditPet(selectedPet!.id, pet);
-    }
-    onFormSubmission();
-  };
+  //   const [error, formAction] = useFormState(addPet, {});
+  //   const handleSubmit = (event: React.FormEvent<HTMLFormElement>) => {
+  //     event.preventDefault();
+  //     const formData = new FormData(event.currentTarget);
+  //     const pet = {
+  //       name: formData.get("name") as string,
+  //       ownerName: formData.get("ownerName") as string,
+  //       imageUrl:
+  //         (formData.get("imageUrl") as string) ||
+  //         "https://bytegrad.com/course-assets/react-nextjs/pet-placeholder.png",
+  //       age: +(formData.get("age") as string),
+  //       notes: formData.get("notes") as string,
+  //     };
+  //     if (actionType === "add") {
+  //       handleAddPet(pet);
+  //     } else if (actionType === "edit") {
+  //       handleEditPet(selectedPet!.id, pet);
+  //     }
+  //     onFormSubmission();
+  //   };
   return (
-    <form onSubmit={handleSubmit} className="flex flex-col">
+    <form
+      action={async (formData) => {
+        onFormSubmission();
+        const petData = {
+          name: formData.get("name") as string,
+          ownerName: formData.get("ownerName") as string,
+          age: Number(formData.get("age")),
+          imageUrl:
+            (formData.get("imageUrl") as string) ||
+            "https://bytegrad.com/course-assets/react-nextjs/pet-placeholder.png",
+          notes: formData.get("notes") as string,
+        };
+
+        if (actionType === "add") {
+          await handleAddPet(petData);
+        } else if (actionType === "edit") {
+          await handleEditPet(selectedPet!.id, petData);
+        }
+      }}
+      className="flex flex-col"
+    >
       <div className="space-y-4">
         <div className="space-y-1">
           <Label htmlFor="name">Name</Label>
@@ -88,9 +109,7 @@ export default function PetForm({
           />
         </div>
       </div>
-      <Button type="submit" className="mt-2 self-end">
-        {actionType === "add" ? "Add Pet" : "Edit pet"}
-      </Button>
+      <PetFormBtn actionType={actionType} />
     </form>
   );
 }

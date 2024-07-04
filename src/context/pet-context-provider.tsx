@@ -1,6 +1,9 @@
 "use client";
-import { Pet } from "@/lib/types";
-import { createContext, useState } from "react";
+import { addPet, checkoutPet, editPet } from "@/actions/action";
+import { PetEssentials } from "@/lib/types";
+import { Pet } from "@prisma/client";
+import { createContext, useOptimistic, useState } from "react";
+import { toast } from "sonner";
 
 type PetContextProviderProps = {
   data: Pet[];
@@ -9,13 +12,13 @@ type PetContextProviderProps = {
 
 type TPetContext = {
   pets: Pet[];
-  selectedPetId: string | null;
+  selectedPetId: Pet["id"] | null;
   selectedPet: Pet | undefined;
-  handleChangeSelectedPetId: (id: string) => void;
-  handleCheckoutPet: (id: string) => void;
+  handleChangeSelectedPetId: (id: Pet["id"]) => void;
+  handleCheckoutPet: (id: Pet["id"]) => void;
   numberofPets: number;
-  handleAddPet: (newPet: Omit<Pet, "id">) => void;
-  handleEditPet: (petId: string, newPetData: Omit<Pet, "id">) => void;
+  handleAddPet: (newPet: PetEssentials) => Promise<void>;
+  handleEditPet: (petId: Pet["id"], newPetData: PetEssentials) => Promise<void>;
 };
 
 export const PetContext = createContext<TPetContext | null>(null);
@@ -25,51 +28,75 @@ export default function PetContextProvider({
   children,
 }: PetContextProviderProps) {
   //state
-  const [pets, setPets] = useState(data);
+  const [optimisticPets, setOptimisticPets] = useOptimistic(
+    data,
+    (state, { action, payload }) => {
+      switch (action) {
+        case "add":
+          return [
+            ...state,
+            {
+              ...payload,
+              id: Date.now().toString(),
+            },
+          ];
+        case "edit":
+          return state.map((pet) => {
+            if (pet.id === payload.id) {
+              return { ...pet, ...payload.newPetData };
+            }
+            return pet;
+          });
+        case "delete":
+          return state.filter((pet) => pet.id !== payload);
+        default:
+          return state;
+      }
+    }
+  );
   const [selectedPetId, setSelectedPetId] = useState<string | null>(null);
 
   //derived state
-  const selectedPet = pets.find((pet) => pet.id === selectedPetId);
-  const numberofPets = pets.length;
+  const selectedPet = optimisticPets.find((pet) => pet.id === selectedPetId);
+  const numberofPets = optimisticPets.length;
 
   // event handlers / actions
 
-  const handleAddPet = (newPet: Omit<Pet, "id">) => {
-    setPets((prev) => [
-      ...prev,
-      {
-        ...newPet,
-        id: Date.now().toString(),
-      },
-    ]);
+  const handleAddPet = async (newPet: PetEssentials) => {
+    setOptimisticPets({ action: "add", payload: newPet });
+    const error = await addPet(newPet);
+    if (error) {
+      toast.warning(error.message);
+      return;
+    }
   };
 
-  const handleEditPet = (petId: string, newPetData: Omit<Pet, "id">) => {
-    setPets((prev) =>
-      prev.map((pet) => {
-        if (pet.id === petId) {
-          return {
-            id: petId,
-            ...newPetData,
-          };
-        }
-        return pet;
-      })
-    );
+  const handleEditPet = async (petId: Pet["id"], newPetData: PetEssentials) => {
+    setOptimisticPets({ action: "edit", payload: { petId, newPetData } });
+    const error = await editPet(petId, newPetData);
+    if (error) {
+      toast.warning(error.message);
+      return;
+    }
   };
-  const handleCheckoutPet = (id: string) => {
-    setPets((prev) => prev.filter((pet) => pet.id !== id));
+  const handleCheckoutPet = async (petId: Pet["id"]) => {
+    setOptimisticPets({ action: "checkout", payload: { petId } });
+    const error = await checkoutPet(petId);
+    if (error) {
+      toast.warning(error.message);
+      return;
+    }
     setSelectedPetId(null);
   };
 
-  const handleChangeSelectedPetId = (id: string) => {
+  const handleChangeSelectedPetId = (id: Pet["id"]) => {
     setSelectedPetId(id);
   };
 
   return (
     <PetContext.Provider
       value={{
-        pets,
+        pets: optimisticPets,
         selectedPetId,
         selectedPet,
         numberofPets,
