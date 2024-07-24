@@ -50,13 +50,16 @@ export default function PetForm({
     formState: { errors },
   } = useForm<TPetForm>({
     resolver: zodResolver(petFormSchema),
-    defaultValues: {
-      name: selectedPet?.name,
-      ownerName: selectedPet?.ownerName,
-      age: selectedPet?.age,
-      imageUrl: selectedPet?.imageUrl,
-      notes: selectedPet?.notes,
-    },
+    defaultValues:
+      actionType === "edit"
+        ? {
+            name: selectedPet?.name,
+            ownerName: selectedPet?.ownerName,
+            age: selectedPet?.age,
+            imageUrl: selectedPet?.imageUrl,
+            notes: selectedPet?.notes,
+          }
+        : undefined,
   });
   return (
     <form
